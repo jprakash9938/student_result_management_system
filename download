@@ -1,0 +1,25 @@
+# IDEs & Editors
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# Build Output
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Environment & Secrets (NEVER commit to version control)
+.env
+*.env.local
+
+# OS Generated Files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
