@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head th:replace="~{fragments :: head('Manage Subjects - Result Management')}"></head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside th:replace="~{fragments :: sidebar('subjects')}"></aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header th:replace="~{fragments :: header('Manage Subjects', 'Create and assign academic subjects.')}"></header>
+
+            <!-- Dual Panel Layout: Form on Left, Table on Right -->
+            <div style="display: grid; grid-template-columns: 1fr 1.8fr; gap: 1.5rem; align-items: start;">
+                
+                <!-- Left Panel: Subject Form -->
+                <div class="card">
+                    <h2 id="form-heading" style="margin-bottom: 1.25rem;">Create Subject</h2>
+                    <form id="subject-form">
+                        <div class="form-group">
+                            <label for="subjectCode">Subject Code</label>
+                            <input type="text" id="subjectCode" placeholder="e.g. CS101" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="subjectName">Subject Name</label>
+                            <input type="text" id="subjectName" placeholder="e.g. Data Structures" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="department">Department</label>
+                            <select id="department" required>
+                                <option value="">Select Department</option>
+                                <option value="Computer Science">Computer Science</option>
+                                <option value="Information Technology">Information Technology</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="Mechanical">Mechanical</option>
+                                <option value="Civil">Civil</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="semester">Semester</label>
+                            <select id="semester" required>
+                                <option value="">Select Semester</option>
+                                <option value="1">Semester 1</option>
+                                <option value="2">Semester 2</option>
+                                <option value="3">Semester 3</option>
+                                <option value="4">Semester 4</option>
+                                <option value="5">Semester 5</option>
+                                <option value="6">Semester 6</option>
+                                <option value="7">Semester 7</option>
+                                <option value="8">Semester 8</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 1.5rem;">
+                            <label for="credits">Credits</label>
+                            <input type="number" id="credits" placeholder="e.g. 4" min="1" max="10" required>
+                        </div>
+
+                        <div style="display: flex; gap: 0.75rem;">
+                            <button type="submit" id="submit-btn" class="btn btn-primary" style="flex: 1; height: 38px;">
+                                <i class="fas fa-plus"></i> Add Subject
+                            </button>
+                            <button type="button" id="cancel-btn" class="btn btn-secondary" style="flex: 1; height: 38px; display: none;">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Right Panel: Subjects Table -->
+                <div class="card" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 150px;">
+                            <label for="filter-dept" style="font-size: 0.8rem;">Filter Department</label>
+                            <select id="filter-dept" style="padding: 0.5rem 0.75rem;">
+                                <option value="">All Departments</option>
+                                <option value="Computer Science">Computer Science</option>
+                                <option value="Information Technology">Information Technology</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="Mechanical">Mechanical</option>
+                                <option value="Civil">Civil</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1; min-width: 100px;">
+                            <label for="filter-sem" style="font-size: 0.8rem;">Filter Semester</label>
+                            <select id="filter-sem" style="padding: 0.5rem 0.75rem;">
+                                <option value="">All Semesters</option>
+                                <option value="1">Sem 1</option>
+                                <option value="2">Sem 2</option>
+                                <option value="3">Sem 3</option>
+                                <option value="4">Sem 4</option>
+                                <option value="5">Sem 5</option>
+                                <option value="6">Sem 6</option>
+                                <option value="7">Sem 7</option>
+                                <option value="8">Sem 8</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table id="subjects-table">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>Department</th>
+                                    <th>Sem</th>
+                                    <th>Credits</th>
+                                    <th style="text-align: right; padding-right: 1.5rem;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="subjects-list-tbody">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; color: var(--text-muted);">Loading subjects...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        let editSubjectId = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            loadSubjects();
+            
+            // Add filter listeners
+            document.getElementById('filter-dept').addEventListener('change', loadSubjects);
+            document.getElementById('filter-sem').addEventListener('change', loadSubjects);
+            
+            // Form action submit
+            document.getElementById('subject-form').addEventListener('submit', handleFormSubmit);
+            
+            // Cancel button action
+            document.getElementById('cancel-btn').addEventListener('click', resetForm);
+        });
+
+        async function loadSubjects() {
+            const dept = document.getElementById('filter-dept').value;
+            const sem = document.getElementById('filter-sem').value;
+
+            let url = '/api/subjects';
+            const params = [];
+            if (dept) params.push(`department=${encodeURIComponent(dept)}`);
+            if (sem) params.push(`semester=${sem}`);
+            if (params.length > 0) {
+                url += '?' + params.join('&');
+            }
+
+            try {
+                const subjects = await apiCall(url);
+                const tbody = document.getElementById('subjects-list-tbody');
+                tbody.replaceChildren(); // Safe DOM clearing
+
+                if (!subjects || subjects.length === 0) {
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('td');
+                    td.colSpan = 6;
+                    td.className = 'text-muted';
+                    td.style.textAlign = 'center';
+                    td.style.padding = '2rem';
+                    td.textContent = 'No subjects matching filters configured in curriculum.';
+                    tr.appendChild(td);
+                    tbody.appendChild(tr);
+                    return;
+                }
+
+                subjects.forEach(subject => {
+                    const tr = document.createElement('tr');
+
+                    const tdCode = document.createElement('td');
+                    tdCode.textContent = subject.code;
+                    tdCode.style.fontWeight = '600';
+
+                    const tdName = document.createElement('td');
+                    tdName.textContent = subject.name;
+
+                    const tdDept = document.createElement('td');
+                    tdDept.textContent = subject.department;
+
+                    const tdSem = document.createElement('td');
+                    tdSem.textContent = subject.semester;
+
+                    const tdCredits = document.createElement('td');
+                    tdCredits.textContent = subject.credits;
+
+                    // Action buttons
+                    const tdActions = document.createElement('td');
+                    tdActions.style.textAlign = 'right';
+                    tdActions.style.paddingRight = '1rem';
+
+                    const editBtn = document.createElement('button');
+                    editBtn.className = 'btn btn-secondary';
+                    editBtn.style.padding = '0.25rem 0.5rem';
+                    editBtn.style.marginRight = '0.4rem';
+                    editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit';
+                    editBtn.onclick = () => startEditSubject(subject);
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'btn btn-danger';
+                    deleteBtn.style.padding = '0.25rem 0.5rem';
+                    deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                    deleteBtn.onclick = () => confirmDeleteSubject(subject.id, subject.name);
+
+                    tdActions.appendChild(editBtn);
+                    tdActions.appendChild(deleteBtn);
+
+                    tr.appendChild(tdCode);
+                    tr.appendChild(tdName);
+                    tr.appendChild(tdDept);
+                    tr.appendChild(tdSem);
+                    tr.appendChild(tdCredits);
+                    tr.appendChild(tdActions);
+
+                    tbody.appendChild(tr);
+                });
+
+            } catch (err) {
+                console.error('Failed to query subjects', err);
+            }
+        }
+
+        function startEditSubject(subject) {
+            editSubjectId = subject.id;
+            
+            // Set form header to edit mode
+            document.getElementById('form-heading').textContent = 'Modify Subject';
+            document.getElementById('submit-btn').innerHTML = '<i class="fas fa-save"></i> Save Changes';
+            document.getElementById('cancel-btn').style.display = 'inline-flex';
+            
+            // Fill values
+            document.getElementById('subjectCode').value = subject.code;
+            document.getElementById('subjectName').value = subject.name;
+            document.getElementById('department').value = subject.department;
+            document.getElementById('semester').value = subject.semester;
+            document.getElementById('credits').value = subject.credits;
+            
+            // Scroll to form on small displays
+            document.getElementById('subject-form').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function resetForm() {
+            editSubjectId = null;
+            document.getElementById('form-heading').textContent = 'Create Subject';
+            document.getElementById('submit-btn').innerHTML = '<i class="fas fa-plus"></i> Add Subject';
+            document.getElementById('cancel-btn').style.display = 'none';
+            document.getElementById('subject-form').reset();
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+
+            const code = document.getElementById('subjectCode').value.trim();
+            const name = document.getElementById('subjectName').value.trim();
+            const department = document.getElementById('department').value;
+            const semester = parseInt(document.getElementById('semester').value);
+            const credits = parseInt(document.getElementById('credits').value);
+
+            const payload = {
+                code,
+                name,
+                department,
+                semester,
+                credits
+            };
+
+            const method = editSubjectId ? 'PUT' : 'POST';
+            const url = editSubjectId ? `/api/subjects/${editSubjectId}` : '/api/subjects';
+            const successMsg = editSubjectId ? 'Subject updated successfully.' : 'New subject added successfully.';
+
+            try {
+                const result = await apiCall(url, {
+                    method: method,
+                    body: JSON.stringify(payload)
+                });
+
+                if (result) {
+                    showToast(successMsg);
+                    resetForm();
+                    loadSubjects();
+                }
+            } catch (err) {
+                // Toast handles server validation display
+            }
+        }
+
+        function confirmDeleteSubject(id, name) {
+            showConfirmModal(
+                'Delete Subject',
+                `Are you sure you want to delete "${name}" from the curriculum? This will also delete any student marks entries linked to this subject.`,
+                async () => {
+                    try {
+                        await apiCall(`/api/subjects/${id}`, { method: 'DELETE' });
+                        showToast(`Successfully deleted: ${name}`);
+                        loadSubjects();
+                        if (editSubjectId === id) resetForm();
+                    } catch (e) {
+                        // Managed by API handler
+                    }
+                }
+            );
+        }
+    </script>
+</body>
+</html>

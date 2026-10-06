@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head th:replace="~{fragments :: head('Student Dashboard - Result Management')}"></head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside th:replace="~{fragments :: sidebar('student-dashboard')}"></aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header th:replace="~{fragments :: header('Student Dashboard', 'Welcome back!')}"></header>
+
+            <!-- Profile Summary Panel -->
+            <div class="card" style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; align-items: center;">
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <h2>Academic Profile</h2>
+                    <div class="student-info-grid">
+                        <div class="student-info-item">
+                            <span>FULL NAME</span>
+                            <span id="profile-name">-</span>
+                        </div>
+                        <div class="student-info-item">
+                            <span>ROLL NUMBER</span>
+                            <span id="profile-roll">-</span>
+                        </div>
+                        <div class="student-info-item">
+                            <span>DEPARTMENT</span>
+                            <span id="profile-dept">-</span>
+                        </div>
+                        <div class="student-info-item">
+                            <span>CURRENT SEMESTER</span>
+                            <span id="profile-sem">-</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Large CGPA Gauge -->
+                <div class="student-gpa-badge">
+                    <div>CUMULATIVE GPA (CGPA)</div>
+                    <div id="profile-cgpa">-</div>
+                </div>
+            </div>
+
+            <!-- Semesters List -->
+            <div>
+                <h2 style="margin-bottom: 1.25rem;">Academic Semesters Results</h2>
+                <div id="semesters-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+                    <!-- Dynamically populated semester cards -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = await getCurrentUser();
+            if (user) {
+                studentId = user.studentId;
+                loadStudentDashboard(studentId);
+            }
+        });
+
+        async function loadStudentDashboard(id) {
+            try {
+                // Fetch student dashboard details (contains overall CGPA and results list)
+                const data = await apiCall(`/api/results/student/${id}/dashboard`);
+                
+                if (data) {
+                    // Populate profile
+                    document.getElementById('profile-name').textContent = data.fullName;
+                    document.getElementById('profile-roll').textContent = data.rollNumber;
+                    document.getElementById('profile-dept').textContent = data.department;
+                    document.getElementById('profile-sem').textContent = 'Semester ' + data.currentSemester;
+                    
+                    // Formatting CGPA
+                    const cgpa = data.cgpa ? data.cgpa.toFixed(2) : '0.00';
+                    document.getElementById('profile-cgpa').textContent = cgpa;
+
+                    // Group results by semester to check status (pass/fail)
+                    const resultsBySemester = {};
+                    data.results.forEach(r => {
+                        resultsBySemester[r.semester] = resultsBySemester[r.semester] || [];
+                        resultsBySemester[r.semester].push(r);
+                    });
+
+                    // Populate semesters cards
+                    const grid = document.getElementById('semesters-grid');
+                    grid.replaceChildren();
+
+                    // If no semesters completed
+                    if (!data.semesterSgpa || Object.keys(data.semesterSgpa).length === 0) {
+                        const card = document.createElement('div');
+                        card.className = 'card';
+                        card.style.textAlign = 'center';
+                        card.style.gridColumn = '1 / -1';
+                        card.style.padding = '3rem';
+                        card.textContent = 'No published grades available for your profile yet.';
+                        grid.appendChild(card);
+                        return;
+                    }
+
+                    // Loop through semesterSgpa (sorted tree keys)
+                    Object.entries(data.semesterSgpa).forEach(([sem, sgpaVal]) => {
+                        const semNum = parseInt(sem);
+                        const semResults = resultsBySemester[semNum] || [];
+                        const isFailed = semResults.some(r => r.grade === 'F');
+
+                        const card = document.createElement('div');
+                        card.className = 'card';
+                        card.style.display = 'flex';
+                        card.style.flexDirection = 'column';
+                        card.style.gap = '1rem';
+
+                        const header = document.createElement('div');
+                        header.style.display = 'flex';
+                        header.style.justifyContent = 'space-between';
+                        header.style.alignItems = 'center';
+                        header.innerHTML = `<h3>Semester ${semNum}</h3>`;
+
+                        const badge = document.createElement('span');
+                        badge.className = `badge badge-${isFailed ? 'fail' : 'pass'}`;
+                        badge.textContent = isFailed ? 'FAILED' : 'PASSED';
+                        header.appendChild(badge);
+
+                        const sgpaBox = document.createElement('div');
+                        sgpaBox.style.display = 'flex';
+                        sgpaBox.style.alignItems = 'baseline';
+                        sgpaBox.style.gap = '0.5rem';
+                        sgpaBox.innerHTML = `
+                            <span style="font-size: 1.75rem; font-weight: 700; color: var(--primary-color);">${sgpaVal.toFixed(2)}</span>
+                            <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">SGPA</span>
+                        `;
+
+                        const footer = document.createElement('div');
+                        footer.style.display = 'flex';
+                        footer.style.gap = '0.5rem';
+                        footer.style.marginTop = '0.5rem';
+
+                        const viewBtn = document.createElement('a');
+                        viewBtn.href = `/student-result.html?semester=${semNum}`;
+                        viewBtn.className = 'btn btn-secondary';
+                        viewBtn.style.flex = '1';
+                        viewBtn.style.fontSize = '0.8rem';
+                        viewBtn.style.padding = '0.5rem';
+                        viewBtn.innerHTML = '<i class="fas fa-eye"></i> View Grades';
+
+                        const pdfBtn = document.createElement('button');
+                        pdfBtn.className = 'btn btn-primary';
+                        pdfBtn.style.padding = '0.5rem 0.75rem';
+                        pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i>';
+                        pdfBtn.title = 'Download Transcript PDF';
+                        pdfBtn.onclick = () => downloadPdf(semNum);
+
+                        footer.appendChild(viewBtn);
+                        footer.appendChild(pdfBtn);
+
+                        card.appendChild(header);
+                        card.appendChild(sgpaBox);
+                        card.appendChild(footer);
+                        grid.appendChild(card);
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to load dashboard', err);
+            }
+        }
+
+        async function downloadPdf(semester) {
+            if (!studentId) return;
+            showToast('Generating PDF Transcript...');
+            window.location.href = `/api/results/student/${studentId}/pdf?semester=${semester}`;
+        }
+    </script>
+</body>
+</html>

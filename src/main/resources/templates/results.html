@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head th:replace="~{fragments :: head('Publish Results - Result Management')}"></head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside th:replace="~{fragments :: sidebar('results')}"></aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header th:replace="~{fragments :: header('Publish Results', 'Verify student marks records and publish them to make them visible on student dashboards.')}"></header>
+                <div>
+                    <button id="publish-batch-btn" class="btn btn-success" disabled>
+                        <i class="fas fa-bullhorn"></i> Publish Selected Drafts
+                    </button>
+                </div>
+            </header>
+
+            <!-- Filters Bar Card -->
+            <div class="card">
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+                    <div style="flex: 1; min-width: 150px;">
+                        <label for="filter-dept">Department</label>
+                        <select id="filter-dept">
+                            <option value="">All Departments</option>
+                            <option value="Computer Science">Computer Science</option>
+                            <option value="Information Technology">Information Technology</option>
+                            <option value="Electronics">Electronics</option>
+                            <option value="Mechanical">Mechanical</option>
+                            <option value="Civil">Civil</option>
+                        </select>
+                    </div>
+                    <div style="width: 120px;">
+                        <label for="filter-sem">Semester</label>
+                        <select id="filter-sem">
+                            <option value="">All</option>
+                            <option value="1">Sem 1</option>
+                            <option value="2">Sem 2</option>
+                            <option value="3">Sem 3</option>
+                            <option value="4">Sem 4</option>
+                            <option value="5">Sem 5</option>
+                            <option value="6">Sem 6</option>
+                            <option value="7">Sem 7</option>
+                            <option value="8">Sem 8</option>
+                        </select>
+                    </div>
+                    <div style="width: 150px;">
+                        <label for="filter-status">Status</label>
+                        <select id="filter-status">
+                            <option value="">All Statuses</option>
+                            <option value="DRAFT">Draft Records</option>
+                            <option value="PUBLISHED">Published Records</option>
+                        </select>
+                    </div>
+                    <button id="filter-btn" class="btn btn-primary" style="height: 38px;">
+                        <i class="fas fa-filter"></i> Apply Filter
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results List Card -->
+            <div class="card" style="flex: 1; display: flex; flex-direction: column; gap: 1rem;">
+                <div class="table-container">
+                    <table id="results-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px; text-align: center;">
+                                    <input type="checkbox" id="select-all-checkbox">
+                                </th>
+                                <th>Roll Number</th>
+                                <th>Student Name</th>
+                                <th>Subject</th>
+                                <th>Semester</th>
+                                <th style="text-align: center;">Marks</th>
+                                <th style="text-align: center;">Grade</th>
+                                <th>Status</th>
+                                <th style="text-align: right; padding-right: 1.5rem;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-list-tbody">
+                            <tr>
+                                <td colspan="9" style="text-align: center; color: var(--text-muted);">Loading marks list...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Custom Modal Frame for Editing Marks Inline -->
+    <div id="edit-marks-modal" class="modal-overlay">
+        <div class="modal-frame">
+            <div class="modal-header">
+                <h3>Update Student Marks</h3>
+                <button class="btn" style="background: transparent;" onclick="closeEditModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p id="edit-modal-student-info" style="font-weight: 600; margin-bottom: 0.5rem;"></p>
+                <p id="edit-modal-subject-info" style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;"></p>
+                
+                <div class="form-group">
+                    <label for="new-marks-input">New Marks Obtained (0 - 100)</label>
+                    <input type="number" id="new-marks-input" min="0" max="100" step="0.5" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+                <button class="btn btn-primary" id="save-marks-btn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        let allResults = [];
+        let selectedResultId = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            loadResults();
+
+            document.getElementById('filter-btn').addEventListener('click', loadResults);
+            document.getElementById('select-all-checkbox').addEventListener('change', toggleSelectAll);
+            document.getElementById('publish-batch-btn').addEventListener('click', publishSelectedDrafts);
+            document.getElementById('save-marks-btn').addEventListener('click', submitUpdateMarks);
+        });
+
+        async function loadResults() {
+            try {
+                // Fetch results (which returns DTO list)
+                allResults = await apiCall('/api/results');
+                renderResultsTable();
+            } catch (err) {
+                console.error('Failed to load results', err);
+            }
+        }
+
+        function renderResultsTable() {
+            const dept = document.getElementById('filter-dept').value;
+            const sem = document.getElementById('filter-sem').value;
+            const status = document.getElementById('filter-status').value;
+
+            // Apply filters on client side or reload
+            let filtered = allResults;
+            
+            // Note: Since API retrieves all, we filter client-side for immediate response
+            // If department or semester filter matches are required:
+            // Since ResultDto doesn't have student department, let's filter what we can,
+            // or fetch subjects or students mapping. 
+            // Wait, does ResultDto have student's department? Let's check ResultDto. No, it only had studentId, rollNumber, studentName.
+            // Wait! To implement search and filter by department/semester correctly for teachers, let's look at the filters.
+            // We can fetch students list, and build a map of studentId -> department.
+            // That is incredibly smart! Let's do that. We fetch students from `/api/students` and build a lookup map!
+            // This guarantees the filters work perfectly on the publishing screen.
+            
+            apiCall('/api/students').then(students => {
+                const studentDeptMap = new Map();
+                students.forEach(s => studentDeptMap.set(s.id, s.department));
+
+                filtered = allResults.filter(r => {
+                    const rDept = studentDeptMap.get(r.studentId) || '';
+                    const matchDept = !dept || rDept === dept;
+                    const matchSem = !sem || String(r.semester) === sem;
+                    const matchStatus = !status || r.status === status;
+                    return matchDept && matchSem && matchStatus;
+                });
+
+                const tbody = document.getElementById('results-list-tbody');
+                tbody.replaceChildren();
+
+                // Reset batch button & master select
+                document.getElementById('select-all-checkbox').checked = false;
+                updatePublishButtonState();
+
+                if (filtered.length === 0) {
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('td');
+                    td.colSpan = 9;
+                    td.className = 'text-muted';
+                    td.style.textAlign = 'center';
+                    td.style.padding = '2rem';
+                    td.textContent = 'No grade records match the filters.';
+                    tr.appendChild(td);
+                    tbody.appendChild(tr);
+                    return;
+                }
+
+                filtered.forEach(result => {
+                    const tr = document.createElement('tr');
+
+                    // Checkbox column
+                    const tdCheck = document.createElement('td');
+                    tdCheck.style.textAlign = 'center';
+                    if (result.status === 'DRAFT') {
+                        const check = document.createElement('input');
+                        check.type = 'checkbox';
+                        check.className = 'draft-row-checkbox';
+                        check.value = result.id;
+                        check.addEventListener('change', updatePublishButtonState);
+                        tdCheck.appendChild(check);
+                    } else {
+                        // Empty cell for published
+                    }
+
+                    const tdRoll = document.createElement('td');
+                    tdRoll.textContent = result.rollNumber;
+                    tdRoll.style.fontWeight = '600';
+
+                    const tdName = document.createElement('td');
+                    tdName.textContent = result.studentName;
+
+                    const tdSub = document.createElement('td');
+                    tdSub.textContent = `${result.subjectCode} - ${result.subjectName}`;
+
+                    const tdSem = document.createElement('td');
+                    tdSem.textContent = 'Sem ' + result.semester;
+
+                    const tdMarks = document.createElement('td');
+                    tdMarks.style.textAlign = 'center';
+                    tdMarks.textContent = result.marks;
+
+                    const tdGrade = document.createElement('td');
+                    tdGrade.style.textAlign = 'center';
+                    tdGrade.style.fontWeight = '700';
+                    tdGrade.textContent = result.grade;
+
+                    const tdStatus = document.createElement('td');
+                    const badge = document.createElement('span');
+                    badge.className = `badge badge-${result.status.toLowerCase()}`;
+                    badge.textContent = result.status;
+                    tdStatus.appendChild(badge);
+
+                    // Actions
+                    const tdActions = document.createElement('td');
+                    tdActions.style.textAlign = 'right';
+                    tdActions.style.paddingRight = '1rem';
+
+                    const editBtn = document.createElement('button');
+                    editBtn.className = 'btn btn-secondary';
+                    editBtn.style.padding = '0.25rem 0.5rem';
+                    editBtn.style.marginRight = '0.4rem';
+                    editBtn.innerHTML = '<i class="fas fa-edit"></i>';
+                    editBtn.onclick = () => openEditModal(result);
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'btn btn-danger';
+                    deleteBtn.style.padding = '0.25rem 0.5rem';
+                    deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                    deleteBtn.onclick = () => confirmDeleteResult(result.id, result.studentName, result.subjectCode);
+
+                    tdActions.appendChild(editBtn);
+                    tdActions.appendChild(deleteBtn);
+
+                    tr.appendChild(tdCheck);
+                    tr.appendChild(tdRoll);
+                    tr.appendChild(tdName);
+                    tr.appendChild(tdSub);
+                    tr.appendChild(tdSem);
+                    tr.appendChild(tdMarks);
+                    tr.appendChild(tdGrade);
+                    tr.appendChild(tdStatus);
+                    tr.appendChild(tdActions);
+
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+
+        function toggleSelectAll(e) {
+            const checked = e.target.checked;
+            document.querySelectorAll('.draft-row-checkbox').forEach(box => {
+                box.checked = checked;
+            });
+            updatePublishButtonState();
+        }
+
+        function updatePublishButtonState() {
+            const selectedBoxes = document.querySelectorAll('.draft-row-checkbox:checked');
+            const btn = document.getElementById('publish-batch-btn');
+            
+            if (selectedBoxes.length > 0) {
+                btn.removeAttribute('disabled');
+                btn.innerHTML = `<i class="fas fa-bullhorn"></i> Publish Selected Drafts (${selectedBoxes.length})`;
+            } else {
+                btn.setAttribute('disabled', 'true');
+                btn.innerHTML = '<i class="fas fa-bullhorn"></i> Publish Selected Drafts';
+            }
+        }
+
+        async function publishSelectedDrafts() {
+            const selectedBoxes = document.querySelectorAll('.draft-row-checkbox:checked');
+            const resultIds = Array.from(selectedBoxes).map(box => parseInt(box.value));
+
+            if (resultIds.length === 0) return;
+
+            try {
+                await apiCall('/api/results/publish', {
+                    method: 'POST',
+                    body: JSON.stringify(resultIds)
+                });
+                
+                showToast(`Successfully published ${resultIds.length} results. Student email notifications triggered.`);
+                loadResults();
+            } catch (e) {
+                // Caught by apiCall
+            }
+        }
+
+        function confirmDeleteResult(id, studentName, subjectCode) {
+            showConfirmModal(
+                'Delete Mark Record',
+                `Are you sure you want to permanently delete the marks for student ${studentName} in subject ${subjectCode}?`,
+                async () => {
+                    try {
+                        await apiCall(`/api/results/${id}`, { method: 'DELETE' });
+                        showToast('Result record deleted successfully.');
+                        loadResults();
+                    } catch (e) {
+                        // Handled
+                    }
+                }
+            );
+        }
+
+        function openEditModal(result) {
+            selectedResultId = result.id;
+            document.getElementById('edit-modal-student-info').textContent = `${result.studentName} (${result.rollNumber})`;
+            document.getElementById('edit-modal-subject-info').textContent = `${result.subjectCode} - ${result.subjectName} (Semester ${result.semester})`;
+            document.getElementById('new-marks-input').value = result.marks;
+
+            const modal = document.getElementById('edit-marks-modal');
+            modal.classList.add('open');
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-marks-modal').classList.remove('open');
+            selectedResultId = null;
+        }
+
+        async function submitUpdateMarks() {
+            if (!selectedResultId) return;
+
+            const newMarks = parseFloat(document.getElementById('new-marks-input').value);
+            if (isNaN(newMarks) || newMarks < 0 || newMarks > 100) {
+                showToast('Please enter a valid marks value between 0 and 100.', 'warning');
+                return;
+            }
+
+            try {
+                const response = await apiCall(`/api/results/${selectedResultId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ marks: newMarks })
+                });
+
+                if (response) {
+                    showToast('Marks updated successfully.');
+                    closeEditModal();
+                    loadResults();
+                }
+            } catch (e) {
+                // Handled
+            }
+        }
+    </script>
+</body>
+</html>

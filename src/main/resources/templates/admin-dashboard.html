@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head th:replace="~{fragments :: head('Admin Dashboard - Result Management')}"></head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside th:replace="~{fragments :: sidebar('admin-dashboard')}"></aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header th:replace="~{fragments :: header('Admin Dashboard', 'Manage users (Teachers and Students).')}"></header>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+                <div class="card" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <h2>Quick Shortcuts</h2>
+                    <div style="display: grid; grid-template-columns: 1fr; gap: 0.75rem; margin-top: 0.5rem;">
+                        <a href="/add-teacher.html" class="btn btn-primary" style="justify-content: flex-start;">
+                            <i class="fas fa-chalkboard-teacher text-white"></i> Create Teacher Account
+                        </a>
+                        <a href="/add-student.html" class="btn btn-primary" style="justify-content: flex-start;">
+                            <i class="fas fa-user-plus text-white"></i> Register New Student
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card" style="grid-column: 1 / -1;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h2>Registered Teachers</h2>
+                        <a href="/add-teacher.html" class="btn btn-secondary btn-sm"><i class="fas fa-plus"></i> Add New</a>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Username</th>
+                                    <th>Full Name</th>
+                                    <th>Email</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="teachers-table-body">
+                                <tr>
+                                    <td colspan="5" class="text-center">Loading teachers...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            loadTeachers();
+        });
+
+        async function loadTeachers() {
+            try {
+                const teachers = await apiCall('/api/teachers');
+                const tbody = document.getElementById('teachers-table-body');
+                
+                if (!teachers || teachers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No teachers found.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                teachers.forEach(teacher => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>#${teacher.id}</td>
+                        <td><strong>${teacher.username}</strong></td>
+                        <td>${teacher.fullName}</td>
+                        <td>${teacher.email}</td>
+                        <td>
+                            <button class="btn btn-danger btn-sm" onclick="deleteTeacher(${teacher.id}, '${teacher.username}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                document.getElementById('teachers-table-body').innerHTML = 
+                    '<tr><td colspan="5" class="text-center text-danger">Failed to load teachers.</td></tr>';
+            }
+        }
+
+        function deleteTeacher(id, name) {
+            showConfirmModal('Delete Teacher', `Are you sure you want to delete teacher ${name}? This action cannot be undone.`, async () => {
+                try {
+                    await apiCall(`/api/teachers/${id}`, { method: 'DELETE' });
+                    showToast('Teacher deleted successfully.', 'success');
+                    loadTeachers();
+                } catch (err) {
+                    // Handled by apiCall
+                }
+            });
+        }
+    </script>
+</body>
+</html>

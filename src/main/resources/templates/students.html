@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head th:replace="~{fragments :: head('Manage Students - Result Management')}"></head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside th:replace="~{fragments :: sidebar('students')}"></aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header th:replace="~{fragments :: header('Manage Students', 'Register and maintain student profiles.')}"></header>
+
+            <!-- Search and Filter Bar Card -->
+            <div class="card">
+                <div class="search-filter-bar">
+                    <div class="search-input-wrapper">
+                        <label for="search-input">Search Student</label>
+                        <input type="text" id="search-input" placeholder="Search by name or roll number...">
+                    </div>
+                    <div style="width: 180px;">
+                        <label for="filter-dept">Department</label>
+                        <select id="filter-dept">
+                            <option value="">All Departments</option>
+                            <option value="Computer Science">Computer Science</option>
+                            <option value="Information Technology">Information Technology</option>
+                            <option value="Electronics">Electronics</option>
+                            <option value="Mechanical">Mechanical</option>
+                            <option value="Civil">Civil</option>
+                        </select>
+                    </div>
+                    <div style="width: 120px;">
+                        <label for="filter-sem">Semester</label>
+                        <select id="filter-sem">
+                            <option value="">All</option>
+                            <option value="1">Sem 1</option>
+                            <option value="2">Sem 2</option>
+                            <option value="3">Sem 3</option>
+                            <option value="4">Sem 4</option>
+                            <option value="5">Sem 5</option>
+                            <option value="6">Sem 6</option>
+                            <option value="7">Sem 7</option>
+                            <option value="8">Sem 8</option>
+                        </select>
+                    </div>
+                    <button id="search-btn" class="btn btn-primary" style="height: 38px;">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </div>
+            </div>
+
+            <!-- Students List Table Card -->
+            <div class="card" style="flex: 1; display: flex; flex-direction: column; gap: 1rem;">
+                <div class="table-container">
+                    <table id="students-table">
+                        <thead>
+                            <tr>
+                                <th>Roll Number</th>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Department</th>
+                                <th>Semester</th>
+                                <th style="text-align: right; padding-right: 2rem;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="students-list-tbody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted);">Loading students list...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            loadStudents();
+            
+            // Set up search handlers
+            document.getElementById('search-btn').addEventListener('click', loadStudents);
+            document.getElementById('search-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') loadStudents();
+            });
+            document.getElementById('filter-dept').addEventListener('change', loadStudents);
+            document.getElementById('filter-sem').addEventListener('change', loadStudents);
+        });
+
+        async function loadStudents() {
+            const search = document.getElementById('search-input').value.trim();
+            const dept = document.getElementById('filter-dept').value;
+            const sem = document.getElementById('filter-sem').value;
+
+            // Construct query parameters
+            let url = '/api/students';
+            const params = [];
+            if (search) params.push(`search=${encodeURIComponent(search)}`);
+            if (dept) params.push(`department=${encodeURIComponent(dept)}`);
+            if (sem) params.push(`semester=${sem}`);
+            if (params.length > 0) {
+                url += '?' + params.join('&');
+            }
+
+            try {
+                const students = await apiCall(url);
+                const tbody = document.getElementById('students-list-tbody');
+                tbody.replaceChildren(); // Safe DOM clearing
+
+                if (!students || students.length === 0) {
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('td');
+                    td.colSpan = 6;
+                    td.className = 'text-muted';
+                    td.style.textAlign = 'center';
+                    td.style.padding = '2rem';
+                    td.textContent = 'No student profiles match the filter criteria.';
+                    tr.appendChild(td);
+                    tbody.appendChild(tr);
+                    return;
+                }
+
+                students.forEach(student => {
+                    const tr = document.createElement('tr');
+
+                    const tdRoll = document.createElement('td');
+                    tdRoll.textContent = student.rollNumber;
+                    tdRoll.style.fontWeight = '600';
+                    
+                    const tdName = document.createElement('td');
+                    tdName.textContent = student.fullName;
+                    
+                    const tdEmail = document.createElement('td');
+                    tdEmail.textContent = student.email;
+                    
+                    const tdDept = document.createElement('td');
+                    tdDept.textContent = student.department;
+                    
+                    const tdSem = document.createElement('td');
+                    tdSem.textContent = 'Semester ' + student.currentSemester;
+
+                    // Actions
+                    const tdActions = document.createElement('td');
+                    tdActions.style.textAlign = 'right';
+                    tdActions.style.paddingRight = '1.5rem';
+
+                    const editBtn = document.createElement('a');
+                    editBtn.href = `/add-student.html?id=${student.id}`;
+                    editBtn.className = 'btn btn-secondary';
+                    editBtn.style.padding = '0.3rem 0.6rem';
+                    editBtn.style.marginRight = '0.5rem';
+                    editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit';
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'btn btn-danger';
+                    deleteBtn.style.padding = '0.3rem 0.6rem';
+                    deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+                    deleteBtn.onclick = () => confirmDeleteStudent(student.id, student.fullName);
+
+                    tdActions.appendChild(editBtn);
+                    tdActions.appendChild(deleteBtn);
+
+                    tr.appendChild(tdRoll);
+                    tr.appendChild(tdName);
+                    tr.appendChild(tdEmail);
+                    tr.appendChild(tdDept);
+                    tr.appendChild(tdSem);
+                    tr.appendChild(tdActions);
+
+                    tbody.appendChild(tr);
+                });
+
+            } catch (err) {
+                console.error('Failed to query students', err);
+            }
+        }
+
+        function confirmDeleteStudent(id, name) {
+            showConfirmModal(
+                'Delete Student',
+                `Are you sure you want to permanently delete the profile for ${name}? This will also delete their login account and all associated marks history.`,
+                async () => {
+                    try {
+                        await apiCall(`/api/students/${id}`, { method: 'DELETE' });
+                        showToast(`Successfully deleted student: ${name}`);
+                        loadStudents();
+                    } catch (e) {
+                        // Error toast handles display
+                    }
+                }
+            );
+        }
+    </script>
+</body>
+</html>

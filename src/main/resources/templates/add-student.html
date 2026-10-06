@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Add/Edit Student - Result Management')}"></head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside th:replace="~{fragments :: sidebar('add-student')}"></aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="content-header">
+                <div>
+                    <h1 id="page-title">Register New Student</h1>
+                    <p id="page-subtitle" style="color: var(--text-secondary);">Enter academic profile details to enroll a new student.</p>
+                </div>
+                <div>
+                    <a href="/students.html" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                </div>
+            </header>
+
+            <!-- Registration Form Card -->
+            <div class="card" style="max-width: 600px;">
+                <form id="student-form">
+                    <div class="form-group">
+                        <label for="rollNumber">Roll Number (Username)</label>
+                        <input type="text" id="rollNumber" placeholder="e.g. CS2026001" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" placeholder="Enter password for the student" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="fullName">Full Name</label>
+                        <input type="text" id="fullName" placeholder="Enter student's full name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" placeholder="student@exemplar.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="department">Department</label>
+                        <select id="department" required>
+                            <option value="">Select Department</option>
+                            <option value="Computer Science">Computer Science</option>
+                            <option value="Information Technology">Information Technology</option>
+                            <option value="Electronics">Electronics</option>
+                            <option value="Mechanical">Mechanical</option>
+                            <option value="Civil">Civil</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 2rem;">
+                        <label for="currentSemester">Current Semester</label>
+                        <select id="currentSemester" required>
+                            <option value="">Select Semester</option>
+                            <option value="1">Semester 1</option>
+                            <option value="2">Semester 2</option>
+                            <option value="3">Semester 3</option>
+                            <option value="4">Semester 4</option>
+                            <option value="5">Semester 5</option>
+                            <option value="6">Semester 6</option>
+                            <option value="7">Semester 7</option>
+                            <option value="8">Semester 8</option>
+                        </select>
+                    </div>
+
+                    <div style="display: flex; gap: 1rem;">
+                        <button type="submit" id="submit-btn" class="btn btn-primary" style="flex: 1; height: 42px;">
+                            <i class="fas fa-save"></i> Register Student
+                        </button>
+                        <a href="/students.html" class="btn btn-secondary" style="flex: 1; height: 42px;">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        let isEditMode = false;
+        let editStudentId = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('id')) {
+                isEditMode = true;
+                editStudentId = urlParams.get('id');
+                document.getElementById('page-title').textContent = 'Edit Student Profile';
+                document.getElementById('page-subtitle').textContent = 'Update student demographic details.';
+                document.getElementById('submit-btn').innerHTML = '<i class="fas fa-save"></i> Update Profile';
+                document.getElementById('rollNumber').readOnly = true; 
+                document.getElementById('password').required = false; 
+                loadStudentDetails(editStudentId);
+            }
+
+            document.getElementById('student-form').addEventListener('submit', handleFormSubmit);
+        });
+
+        async function loadStudentDetails(id) {
+            try {
+                const student = await apiCall(`/api/students/${id}`);
+                if (student) {
+                    document.getElementById('rollNumber').value = student.rollNumber;
+                    document.getElementById('fullName').value = student.fullName;
+                    document.getElementById('email').value = student.email;
+                    document.getElementById('department').value = student.department;
+                    document.getElementById('currentSemester').value = student.currentSemester;
+                }
+            } catch (err) {
+                console.error('Failed to load student details', err);
+            }
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+
+            const rollNumber = document.getElementById('rollNumber').value.trim();
+            const password = document.getElementById('password').value;
+            const fullName = document.getElementById('fullName').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const department = document.getElementById('department').value;
+            const currentSemester = parseInt(document.getElementById('currentSemester').value);
+
+            const payload = {
+                rollNumber,
+                password,
+                fullName,
+                email,
+                department,
+                currentSemester
+            };
+
+            const method = editStudentId ? 'PUT' : 'POST';
+            const url = editStudentId ? `/api/students/${editStudentId}` : '/api/students';
+            const successMsg = editStudentId ? 'Student profile updated successfully.' : 'New student registered successfully.';
+
+            try {
+                const result = await apiCall(url, {
+                    method: method,
+                    body: JSON.stringify(payload)
+                });
+
+                if (result) {
+                    showToast(successMsg, 'success');
+                    setTimeout(() => {
+                        window.location.href = '/students.html';
+                    }, 1200);
+                }
+            } catch (err) {
+                // Global error toast displays validations/failures
+            }
+        }
+    </script>
+</body>
+</html>

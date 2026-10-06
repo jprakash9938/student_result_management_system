@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head th:replace="~{fragments :: head('My Results - Result Management')}"></head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside th:replace="~{fragments :: sidebar('student-result')}"></aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header th:replace="~{fragments :: header('Semester Transcript', 'Your official semester transcripts and grades.')}"></header>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <a href="/student-dashboard.html" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Dashboard
+                </a>
+                <button id="download-pdf-btn" class="btn btn-primary">
+                    <i class="fas fa-file-pdf"></i> Download PDF
+                </button>
+            </div>
+
+            <!-- Student Demographics metadata -->
+            <div class="card">
+                <div class="student-info-grid">
+                    <div class="student-info-item">
+                        <span>STUDENT NAME</span>
+                        <span id="meta-name">-</span>
+                    </div>
+                    <div class="student-info-item">
+                        <span>ROLL NUMBER</span>
+                        <span id="meta-roll">-</span>
+                    </div>
+                    <div class="student-info-item">
+                        <span>DEPARTMENT</span>
+                        <span id="meta-dept">-</span>
+                    </div>
+                    <div class="student-info-item">
+                        <span>ACADEMIC SEMESTER</span>
+                        <span id="meta-sem">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grades Details Table -->
+            <div class="card" style="display: flex; flex-direction: column; gap: 1rem;">
+                <h2>Marks & Grades Breakdown</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Subject Code</th>
+                                <th>Subject Name</th>
+                                <th style="text-align: center;">Credits</th>
+                                <th style="text-align: center;">Marks Obtained (100)</th>
+                                <th style="text-align: center;">Letter Grade</th>
+                            </tr>
+                        </thead>
+                        <tbody id="grades-table-tbody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-muted);">Loading grades breakdown...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Calculated Summary block -->
+            <div class="card" style="display: flex; flex-direction: column; gap: 1rem;">
+                <h2>Semester Calculations Summary</h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.25rem;">
+                    <div class="student-gpa-badge" style="padding: 0.8rem; background-color: rgba(59, 130, 246, 0.04);">
+                        <div style="font-size: 0.75rem;">Total Marks</div>
+                        <div id="calc-total" style="font-size: 1.6rem; font-weight: 700; margin-top: 0.25rem;">-</div>
+                    </div>
+                    <div class="student-gpa-badge" style="padding: 0.8rem; background-color: rgba(59, 130, 246, 0.04);">
+                        <div style="font-size: 0.75rem;">Aggregate Percentage</div>
+                        <div id="calc-percentage" style="font-size: 1.6rem; font-weight: 700; margin-top: 0.25rem;">-</div>
+                    </div>
+                    <div class="student-gpa-badge" style="padding: 0.8rem; background-color: rgba(59, 130, 246, 0.04);">
+                        <div style="font-size: 0.75rem;">Semester SGPA</div>
+                        <div id="calc-sgpa" style="font-size: 1.6rem; font-weight: 700; margin-top: 0.25rem; color: var(--primary-color);">-</div>
+                    </div>
+                    <div class="student-gpa-badge" style="padding: 0.8rem; background-color: rgba(59, 130, 246, 0.04);">
+                        <div style="font-size: 0.75rem;">Cumulative CGPA</div>
+                        <div id="calc-cgpa" style="font-size: 1.6rem; font-weight: 700; margin-top: 0.25rem; color: var(--primary-color);">-</div>
+                    </div>
+                    <div class="student-gpa-badge" style="padding: 0.8rem; background-color: rgba(59, 130, 246, 0.04);">
+                        <div style="font-size: 0.75rem;">Result Status</div>
+                        <div id="calc-status" style="font-size: 1.4rem; font-weight: 800; margin-top: 0.35rem;">-</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        let studentId = null;
+        let semester = null;
+        let dashboardData = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = await getCurrentUser();
+            if (user) {
+                studentId = user.studentId;
+
+                // Load dashboard data first
+                dashboardData = await apiCall(`/api/results/student/${studentId}/dashboard`);
+                if (!dashboardData) return;
+
+                // Parse semester from query params or fallback to currentSemester
+                const urlParams = new URLSearchParams(window.location.search);
+                const paramSem = parseInt(urlParams.get('semester'));
+
+                if (paramSem && !isNaN(paramSem) && paramSem >= 1 && paramSem <= 8) {
+                    semester = paramSem;
+                } else {
+                    semester = dashboardData.currentSemester || 1;
+                }
+
+                const headerTitle = document.querySelector('.content-header h1');
+                if (headerTitle) {
+                    headerTitle.textContent = `Semester ${semester} Mark Sheet`;
+                }
+
+                document.getElementById('meta-sem').textContent = `Semester ${semester}`;
+
+                loadResultSheet();
+                document.getElementById('download-pdf-btn').addEventListener('click', downloadPdf);
+            }
+        });
+
+        async function loadResultSheet() {
+            try {
+                const data = dashboardData;
+                
+                if (data) {
+                    // Populate demographics
+                    document.getElementById('meta-name').textContent = data.fullName;
+                    document.getElementById('meta-roll').textContent = data.rollNumber;
+                    document.getElementById('meta-dept').textContent = data.department;
+
+                    // Filter results for this semester
+                    const semesterResults = data.results.filter(r => r.semester === semester);
+                    
+                    // Fetch subject details for credits
+                    const subjects = await apiCall(`/api/subjects?semester=${semester}`);
+                    const subjectCreditsMap = new Map();
+                    subjects.forEach(s => subjectCreditsMap.set(s.code, s.credits));
+
+                    const tbody = document.getElementById('grades-table-tbody');
+                    tbody.replaceChildren();
+
+                    if (semesterResults.length === 0) {
+                        const tr = document.createElement('tr');
+                        const td = document.createElement('td');
+                        td.colSpan = 5;
+                        td.className = 'text-muted';
+                        td.style.textAlign = 'center';
+                        td.style.padding = '2rem';
+                        td.textContent = 'No published marks found for this semester.';
+                        tr.appendChild(td);
+                        tbody.appendChild(tr);
+                        return;
+                    }
+
+                    let totalMarksObtained = 0;
+                    let totalCredits = 0;
+                    let failedAny = false;
+
+                    semesterResults.forEach(r => {
+                        const credits = subjectCreditsMap.get(r.subjectCode) || 0;
+                        totalMarksObtained += r.marks;
+                        totalCredits += credits;
+                        if (r.grade === 'F') failedAny = true;
+
+                        const tr = document.createElement('tr');
+
+                        const tdCode = document.createElement('td');
+                        tdCode.textContent = r.subjectCode;
+                        tdCode.style.fontWeight = '600';
+
+                        const tdName = document.createElement('td');
+                        tdName.textContent = r.subjectName;
+
+                        const tdCredits = document.createElement('td');
+                        tdCredits.style.textAlign = 'center';
+                        tdCredits.textContent = credits;
+
+                        const tdMarks = document.createElement('td');
+                        tdMarks.style.textAlign = 'center';
+                        tdMarks.textContent = r.marks;
+
+                        const tdGrade = document.createElement('td');
+                        tdGrade.style.textAlign = 'center';
+                        tdGrade.style.fontWeight = '700';
+                        tdGrade.textContent = r.grade;
+                        if (r.grade === 'F') {
+                            tdGrade.style.color = 'var(--danger)';
+                        }
+
+                        tr.appendChild(tdCode);
+                        tr.appendChild(tdName);
+                        tr.appendChild(tdCredits);
+                        tr.appendChild(tdMarks);
+                        tr.appendChild(tdGrade);
+
+                        tbody.appendChild(tr);
+                    });
+
+                    // Summary Calculations
+                    const maxMarks = semesterResults.length * 100;
+                    const percentage = (totalMarksObtained / maxMarks) * 100;
+                    const sgpa = data.semesterSgpa[semester] || 0.0;
+                    const cgpa = data.cgpa || 0.0;
+
+                    document.getElementById('calc-total').textContent = `${totalMarksObtained.toFixed(1)} / ${maxMarks}`;
+                    document.getElementById('calc-percentage').textContent = `${percentage.toFixed(1)}%`;
+                    document.getElementById('calc-sgpa').textContent = sgpa.toFixed(2);
+                    document.getElementById('calc-cgpa').textContent = cgpa.toFixed(2);
+                    
+                    const statusEl = document.getElementById('calc-status');
+                    if (failedAny) {
+                        statusEl.textContent = 'FAILED';
+                        statusEl.style.color = 'var(--danger)';
+                    } else {
+                        statusEl.textContent = 'PASSED';
+                        statusEl.style.color = 'var(--success)';
+                    }
+                }
+
+            } catch (err) {
+                console.error('Failed to load result sheets', err);
+            }
+        }
+
+        function downloadPdf() {
+            if (!studentId || !semester) return;
+            showToast('Generating PDF Transcript...');
+            window.location.href = `/api/results/student/${studentId}/pdf?semester=${semester}`;
+        }
+    </script>
+</body>
+</html>

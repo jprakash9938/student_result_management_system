@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head th:replace="~{fragments :: head('Enter Marks - Result Management')}"></head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside th:replace="~{fragments :: sidebar('marks')}"></aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header th:replace="~{fragments :: header('Enter Marks', 'Record subject scores for students.')}"></header>
+
+            <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 1.5rem; align-items: start;">
+                <!-- Marks Entry Card -->
+                <div class="card">
+                    <h2>Manual Grade Entry</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.25rem;">
+                        Marks entered manually are saved in <strong>DRAFT</strong> status. Remember to publish them later in the publishing tab.
+                    </p>
+
+                    <form id="marks-form">
+                        <!-- Student Roll Number Input -->
+                        <div class="form-group">
+                            <label for="rollNumber">Student Roll Number</label>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <input type="text" id="rollNumber" placeholder="e.g. CS2026001" required autocomplete="off">
+                                <button type="button" id="verify-student-btn" class="btn btn-secondary" style="height: 38px; font-size: 0.8rem;">
+                                    Verify
+                                </button>
+                            </div>
+                            <!-- Verified Student Display Banner -->
+                            <div id="student-verification-banner" style="margin-top: 0.4rem; padding: 0.4rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.85rem; display: none;"></div>
+                        </div>
+
+                        <!-- Subject Dropdown -->
+                        <div class="form-group">
+                            <label for="subjectSelect">Subject Code & Name</label>
+                            <select id="subjectSelect" required>
+                                <option value="">Select Subject</option>
+                            </select>
+                        </div>
+
+                        <!-- Semester Input (Auto-calculated / prefilled based on Subject) -->
+                        <div class="form-group">
+                            <label for="semesterDisplay">Semester (Auto-filled)</label>
+                            <input type="text" id="semesterDisplay" readonly placeholder="Select a subject first..." style="background-color: rgba(0,0,0,0.03);">
+                            <input type="hidden" id="semesterValue">
+                        </div>
+
+                        <!-- Marks Input -->
+                        <div class="form-group" style="margin-bottom: 1.5rem;">
+                            <label for="marks">Marks Obtained (0 - 100)</label>
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <input type="number" id="marks" placeholder="Enter score" min="0" max="100" step="0.5" required style="flex: 1;">
+                                <div class="student-gpa-badge" style="padding: 0.4rem 0.8rem; min-width: 80px; flex-shrink: 0; background-color: rgba(59, 130, 246, 0.04);">
+                                    <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted);">PREVIEW</div>
+                                    <div id="grade-preview" style="font-size: 1.25rem; font-weight: 800; color: var(--primary-color);">-</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" style="width: 100%; height: 42px;">
+                            <i class="fas fa-save"></i> Save Mark Record
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Guidance Info Card -->
+                <div class="card" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <h2>Grading Policy Reference</h2>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Marks Range</th>
+                                    <th>Letter Grade</th>
+                                    <th>Grade Points</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>90 - 100</td>
+                                    <td><span class="badge badge-published">A+</span></td>
+                                    <td>10.0</td>
+                                </tr>
+                                <tr>
+                                    <td>80 - 89</td>
+                                    <td><span class="badge badge-published">A</span></td>
+                                    <td>9.0</td>
+                                </tr>
+                                <tr>
+                                    <td>70 - 79</td>
+                                    <td><span class="badge badge-published">B</span></td>
+                                    <td>8.0</td>
+                                </tr>
+                                <tr>
+                                    <td>60 - 69</td>
+                                    <td><span class="badge badge-published">C</span></td>
+                                    <td>7.0</td>
+                                </tr>
+                                <tr>
+                                    <td>50 - 59</td>
+                                    <td><span class="badge badge-published">D</span></td>
+                                    <td>6.0</td>
+                                </tr>
+                                <tr>
+                                    <td>Below 50</td>
+                                    <td><span class="badge badge-fail">F (Fail)</span></td>
+                                    <td>0.0</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        let allSubjects = [];
+        let verifiedStudent = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+                document.getElementById('rollNumber').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        verifyStudent();
+                    }
+                });
+
+                // Auto semester fill based on subject
+                document.getElementById('subjectSelect').addEventListener('change', (e) => {
+                    const subjectCode = e.target.value;
+                    const semDisplay = document.getElementById('semesterDisplay');
+                    const semVal = document.getElementById('semesterValue');
+
+                    if (!subjectCode) {
+                        semDisplay.value = '';
+                        semVal.value = '';
+                        return;
+                    }
+
+                    const subject = allSubjects.find(s => s.code === subjectCode);
+                    if (subject) {
+                        semDisplay.value = `Semester ${subject.semester} (Credits: ${subject.credits})`;
+                        semVal.value = subject.semester;
+                    }
+                });
+
+                // Form submit
+                document.getElementById('marks-form').addEventListener('submit', handleMarksSubmit);
+
+                // Verify Button Click Listener
+                document.getElementById('verify-student-btn').addEventListener('click', verifyStudent);
+
+                // Grade Preview Input Listener
+                document.getElementById('marks').addEventListener('input', (e) => {
+                    document.getElementById('grade-preview').textContent = previewGrade(e.target.value);
+                });
+
+                // Load subjects list
+                await loadSubjectsList();
+        });
+
+        async function loadSubjectsList() {
+            try {
+                allSubjects = await apiCall('/api/subjects');
+                const select = document.getElementById('subjectSelect');
+                
+                allSubjects.forEach(subject => {
+                    const opt = document.createElement('option');
+                    opt.value = subject.code;
+                    opt.textContent = `${subject.code} - ${subject.name} (${subject.department})`;
+                    select.appendChild(opt);
+                });
+            } catch (err) {
+                console.error('Failed to load subjects', err);
+            }
+        }
+
+        async function verifyStudent() {
+            const rollNumber = document.getElementById('rollNumber').value.trim();
+            const banner = document.getElementById('student-verification-banner');
+
+            if (!rollNumber) {
+                showToast('Please type a Roll Number first.', 'warning');
+                return;
+            }
+
+            try {
+                // Fetch student by roll number
+                const student = await apiCall(`/api/students?search=${encodeURIComponent(rollNumber)}`);
+                const matched = student.find(s => s.rollNumber.equalsIgnoreCase(rollNumber));
+
+                if (matched) {
+                    verifiedStudent = matched;
+                    banner.style.display = 'block';
+                    banner.style.backgroundColor = 'rgba(16, 185, 129, 0.08)';
+                    banner.style.border = '1px solid rgba(16, 185, 129, 0.2)';
+                    banner.style.color = 'var(--success)';
+                    banner.textContent = `✓ Student Verified: ${matched.fullName} (${matched.department}, Semester ${matched.currentSemester})`;
+                } else {
+                    throw new Error();
+                }
+            } catch (e) {
+                verifiedStudent = null;
+                banner.style.display = 'block';
+                banner.style.backgroundColor = 'rgba(239, 68, 68, 0.08)';
+                banner.style.border = '1px solid rgba(239, 68, 68, 0.2)';
+                banner.style.color = 'var(--danger)';
+                banner.textContent = `✗ Student not found in database registry. Check the spelling.`;
+            }
+        }
+
+        async function handleMarksSubmit(e) {
+            e.preventDefault();
+
+            const rollNumber = document.getElementById('rollNumber').value.trim();
+            const subjectCode = document.getElementById('subjectSelect').value;
+            const semester = parseInt(document.getElementById('semesterValue').value);
+            const marks = parseFloat(document.getElementById('marks').value);
+
+            if (!verifiedStudent || verifiedStudent.rollNumber.toLowerCase() !== rollNumber.toLowerCase()) {
+                showToast('Please verify the student profile before saving marks.', 'warning');
+                return;
+            }
+
+            const payload = {
+                rollNumber,
+                subjectCode,
+                semester,
+                marks
+            };
+
+            try {
+                const response = await apiCall('/api/results', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                if (response) {
+                    showToast(`Marks successfully recorded in drafts for student ${rollNumber}.`);
+                    document.getElementById('marks-form').reset();
+                    document.getElementById('student-verification-banner').style.display = 'none';
+                    document.getElementById('grade-preview').textContent = '-';
+                    verifiedStudent = null;
+                }
+            } catch (err) {
+                // Server-side duplicate validation messages handled by API call
+            }
+        }
+
+        function previewGrade(marks) {
+            if (marks === '') return '-';
+            const m = parseFloat(marks);
+            if (isNaN(m) || m < 0 || m > 100) return 'Invalid';
+            if (m >= 90) return 'A+';
+            if (m >= 80) return 'A';
+            if (m >= 70) return 'B';
+            if (m >= 60) return 'C';
+            if (m >= 50) return 'D';
+            return 'F';
+        }
+
+        // Case-insensitive string equality helper
+        String.prototype.equalsIgnoreCase = function (compareString) {
+            return this.toLowerCase() === compareString.toLowerCase();
+        };
+    </script>
+</body>
+</html>

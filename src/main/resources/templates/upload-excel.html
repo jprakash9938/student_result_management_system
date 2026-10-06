@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head th:replace="~{fragments :: head('Upload Excel - Result Management')}"></head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside th:replace="~{fragments :: sidebar('upload-excel')}"></aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header th:replace="~{fragments :: header('Upload Excel', 'Bulk upload students or marks.')}"></header>
+
+            <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.5rem; align-items: start;">
+                <!-- Left Panel: Dropzone & Upload Button -->
+                <div class="card" style="display: flex; flex-direction: column; gap: 1.25rem;">
+                    <h2>Import Spreadsheet</h2>
+                    
+                    <div id="dropzone" class="file-dropzone">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h3>Drag & Drop Spreadsheet here</h3>
+                        <p style="color: var(--text-muted); font-size: 0.8rem;">Supports Microsoft Excel files (.xlsx)</p>
+                        <span style="color: var(--text-secondary); font-size: 0.9rem;">or</span>
+                        <button type="button" id="browse-btn" class="btn btn-secondary" style="padding: 0.4rem 1rem;">
+                            Browse Files
+                        </button>
+                        <input type="file" id="file-input" accept=".xlsx" style="display: none;">
+                    </div>
+                    
+                    <!-- Selected File Banner -->
+                    <div id="selected-file-banner" style="display: none; align-items: center; justify-content: space-between; padding: 0.6rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.9rem;">
+                        <div>
+                            <i class="fas fa-file-excel text-primary" style="margin-right: 0.5rem;"></i>
+                            <span id="file-name" style="font-weight: 600;">Filename.xlsx</span>
+                        </div>
+                        <button id="clear-file-btn" class="btn" style="background: transparent; color: var(--danger); padding: 0.2rem;"><i class="fas fa-times"></i></button>
+                    </div>
+
+                    <button type="button" id="upload-btn" class="btn btn-primary" style="width: 100%; height: 42px;" disabled>
+                        <i class="fas fa-file-import"></i> Process & Save Records
+                    </button>
+                </div>
+
+                <!-- Right Panel: Template Guidelines -->
+                <div class="card" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <h2>File Structure Guidelines</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem;">
+                        The uploaded Excel file must have a header row as the first row. The system reads records starting from <strong>Row 2</strong>.
+                    </p>
+                    <div style="font-size: 0.85rem; border: 1px solid var(--border-color); padding: 1rem; border-radius: var(--radius-sm); background-color: rgba(0,0,0,0.02);">
+                        <p style="font-weight: 700; margin-bottom: 0.5rem;">Required Columns (Order and names matter):</p>
+                        <ol style="margin-left: 1.25rem; display: flex; flex-direction: column; gap: 0.4rem;">
+                            <li><strong>Column A:</strong> Roll Number (must match student roll number)</li>
+                            <li><strong>Column B:</strong> Subject Code (must match subject code)</li>
+                            <li><strong>Column C:</strong> Semester (integer between 1 and 8)</li>
+                            <li><strong>Column D:</strong> Marks (numeric between 0 and 100)</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Results Log Panel -->
+            <div id="results-log-card" class="card" style="display: none; flex-direction: column; gap: 1.25rem;">
+                <h2>Import Status Results</h2>
+                
+                <!-- Stats Summary -->
+                <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                    <div class="student-gpa-badge" style="flex: 1; min-width: 120px; text-align: center; background-color: rgba(59, 130, 246, 0.04);">
+                        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Rows Evaluated</div>
+                        <div id="log-total" style="font-size: 1.75rem; font-weight: 700;">-</div>
+                    </div>
+                    <div class="student-gpa-badge" style="flex: 1; min-width: 120px; text-align: center; background-color: rgba(16, 185, 129, 0.04);">
+                        <div style="font-size: 0.8rem; color: var(--success); font-weight: 600;">Successfully Imported</div>
+                        <div id="log-success" style="font-size: 1.75rem; font-weight: 700; color: var(--success);">-</div>
+                    </div>
+                    <div class="student-gpa-badge" style="flex: 1; min-width: 120px; text-align: center; background-color: rgba(239, 68, 68, 0.04);">
+                        <div style="font-size: 0.8rem; color: var(--danger); font-weight: 600;">Failed Rows</div>
+                        <div id="log-failed" style="font-size: 1.75rem; font-weight: 700; color: var(--danger);">-</div>
+                    </div>
+                </div>
+
+                <div id="publish-redirect-notice" style="display: none; padding: 0.75rem 1rem; background-color: rgba(16, 185, 129, 0.08); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); font-size: 0.9rem; align-items: center; justify-content: space-between;">
+                    <span>✓ Imported records saved as drafts successfully. You can now publish them for students.</span>
+                    <a href="/results.html" class="btn btn-success" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">
+                        Go to Publish Board <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+
+                <!-- Error logs -->
+                <div id="error-logs-container" style="display: none; flex-direction: column; gap: 0.5rem;">
+                    <h3 style="color: var(--danger);"><i class="fas fa-exclamation-triangle"></i> Row Validation Errors</h3>
+                    <div style="max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem;">
+                        <ul id="error-logs-list" style="list-style: none; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; color: var(--text-secondary);"></ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        let selectedFile = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            setupDragAndDrop();
+            
+            // Trigger button file browse
+            document.getElementById('browse-btn').addEventListener('click', () => {
+                document.getElementById('file-input').click();
+            });
+            
+            document.getElementById('file-input').addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFileSelection(e.target.files[0]);
+                }
+            });
+
+                document.getElementById('clear-file-btn').addEventListener('click', clearFile);
+
+                document.getElementById('upload-btn').addEventListener('click', processFileUpload);
+            }
+        });
+
+        function setupDragAndDrop() {
+            const dropzone = document.getElementById('dropzone');
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.add('dragover');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.remove('dragover');
+                }, false);
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length > 0) {
+                    // Check if file is Excel
+                    const file = files[0];
+                    if (file.name.endsWith('.xlsx')) {
+                        handleFileSelection(file);
+                    } else {
+                        showToast('Please select only Excel (.xlsx) files.', 'error');
+                    }
+                }
+            });
+        }
+
+        function handleFileSelection(file) {
+            selectedFile = file;
+            document.getElementById('file-name').textContent = file.name;
+            document.getElementById('selected-file-banner').style.display = 'flex';
+            document.getElementById('dropzone').style.display = 'none';
+            document.getElementById('upload-btn').removeAttribute('disabled');
+        }
+
+        function clearFile() {
+            selectedFile = null;
+            document.getElementById('file-input').value = '';
+            document.getElementById('selected-file-banner').style.display = 'none';
+            document.getElementById('dropzone').style.display = 'flex';
+            document.getElementById('upload-btn').setAttribute('disabled', 'true');
+        }
+
+        async function processFileUpload() {
+            if (!selectedFile) return;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            const uploadBtn = document.getElementById('upload-btn');
+            uploadBtn.setAttribute('disabled', 'true');
+            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing spreadsheet...';
+
+            try {
+                // Post FormData
+                const result = await apiCall('/api/results/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (result) {
+                    showToast('Excel processing complete!');
+                    displayUploadStats(result);
+                }
+            } catch (err) {
+                // Toast handles rendering
+            } finally {
+                uploadBtn.removeAttribute('disabled');
+                uploadBtn.innerHTML = '<i class="fas fa-file-import"></i> Process & Save Records';
+            }
+        }
+
+        function displayUploadStats(data) {
+            document.getElementById('results-log-card').style.display = 'flex';
+            document.getElementById('log-total').textContent = data.totalRows;
+            document.getElementById('log-success').textContent = data.successfulRows;
+            document.getElementById('log-failed').textContent = data.failedRows;
+
+            const notice = document.getElementById('publish-redirect-notice');
+            if (data.successfulRows > 0) {
+                notice.style.display = 'flex';
+            } else {
+                notice.style.display = 'none';
+            }
+
+            const errorContainer = document.getElementById('error-logs-container');
+            const errorList = document.getElementById('error-logs-list');
+            errorList.replaceChildren();
+
+            if (data.failedRows > 0 && data.errors && data.errors.length > 0) {
+                errorContainer.style.display = 'flex';
+                data.errors.forEach(err => {
+                    const li = document.createElement('li');
+                    li.style.borderBottom = '1px solid rgba(239, 68, 68, 0.05)';
+                    li.style.paddingBottom = '0.2rem';
+                    li.textContent = err;
+                    errorList.appendChild(li);
+                });
+            } else {
+                errorContainer.style.display = 'none';
+            }
+
+            // Scroll to stats output
+            document.getElementById('results-log-card').scrollIntoView({ behavior: 'smooth' });
+            clearFile();
+        }
+    </script>
+</body>
+</html>

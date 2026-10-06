@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:fragment="head(title)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${title}">Result Management</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+
+<!-- Dynamic Sidebar Fragment -->
+<aside th:fragment="sidebar(activePage)" class="sidebar" id="app-sidebar">
+    <div class="sidebar-logo">
+        <i class="fas fa-graduation-cap"></i>
+        <span>Result Portal</span>
+    </div>
+    
+    <nav class="nav-menu">
+        <!-- ADMIN LINKS -->
+        <div sec:authorize="hasAuthority('ROLE_ADMIN')">
+            <li th:class="${activePage == 'admin-dashboard' ? 'nav-item active' : 'nav-item'}">
+                <a th:href="@{/admin-dashboard.html}"><i class="fas fa-chart-pie"></i> Dashboard</a>
+            </li>
+            <li th:class="${activePage == 'add-teacher' ? 'nav-item active' : 'nav-item'}">
+                <a th:href="@{/add-teacher.html}"><i class="fas fa-chalkboard-teacher"></i> Add Teacher</a>
+            </li>
+            <li th:class="${activePage == 'students' or activePage == 'add-student' ? 'nav-item active' : 'nav-item'}">
+                <a th:href="@{/students.html}"><i class="fas fa-user-graduate"></i> Manage Students</a>
+            </li>
+        </div>
+        
+        <!-- TEACHER LINKS -->
+        <div sec:authorize="hasAuthority('ROLE_TEACHER')">
+            <li th:class="${activePage == 'teacher-dashboard' ? 'nav-item active' : 'nav-item'}">
+                <a th:href="@{/teacher-dashboard.html}"><i class="fas fa-chart-pie"></i> Dashboard</a>
+            </li>
+            <li th:class="${activePage == 'students' or activePage == 'add-student' ? 'nav-item active' : 'nav-item'}">
+                <a th:href="@{/students.html}"><i class="fas fa-user-graduate"></i> Students</a>
+            </li>
+            <li th:class="${activePage == 'subjects' ? 'nav-item active' : 'nav-item'}">
+                <a th:href="@{/subjects.html}"><i class="fas fa-book"></i> Subjects</a>
+            </li>
+            <li th:class="${activePage == 'marks' ? 'nav-item active' : 'nav-item'}">
+                <a th:href="@{/marks.html}"><i class="fas fa-edit"></i> Enter Marks</a>
+            </li>
+            <li th:class="${activePage == 'upload-excel' ? 'nav-item active' : 'nav-item'}">
+                <a th:href="@{/upload-excel.html}"><i class="fas fa-file-excel"></i> Upload Excel</a>
+            </li>
+            <li th:class="${activePage == 'results' ? 'nav-item active' : 'nav-item'}">
+                <a th:href="@{/results.html}"><i class="fas fa-bullhorn"></i> Publish Results</a>
+            </li>
+        </div>
+        
+        <!-- STUDENT LINKS -->
+        <div sec:authorize="hasAuthority('ROLE_STUDENT')">
+            <li th:class="${activePage == 'student-dashboard' ? 'nav-item active' : 'nav-item'}">
+                <a th:href="@{/student-dashboard.html}"><i class="fas fa-chart-pie"></i> Dashboard</a>
+            </li>
+            <li th:class="${activePage == 'student-result' ? 'nav-item active' : 'nav-item'}">
+                <a th:href="@{/student-result.html}"><i class="fas fa-file-alt"></i> My Results</a>
+            </li>
+        </div>
+    </nav>
+    
+    <div class="sidebar-footer">
+        <button id="theme-toggle-btn" class="theme-toggle-btn">
+            <i id="theme-icon" class="fas fa-moon"></i>
+            <span id="theme-label">Dark Mode</span>
+        </button>
+        <button class="btn btn-secondary" onclick="handleLogout()" style="width: 100%;">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+    </div>
+</aside>
+
+<!-- Dynamic Header Fragment -->
+<header th:fragment="header(title, subtitle)" class="content-header">
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+    <div style="display: flex; align-items: center; gap: 1rem;">
+        <button id="mobile-menu-btn" class="mobile-menu-btn">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div>
+            <h1 th:text="${title}">Title</h1>
+            <p style="color: var(--text-secondary);" th:text="${subtitle}">Subtitle</p>
+        </div>
+    </div>
+    <div class="user-profile-header">
+        <div class="avatar" id="header-user-avatar">?</div>
+        <div>
+            <div style="font-weight: 600;" id="header-user-name">Loading...</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);" sec:authorize="hasAuthority('ROLE_ADMIN')">Administrator</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);" sec:authorize="hasAuthority('ROLE_TEACHER')">Teacher</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);" sec:authorize="hasAuthority('ROLE_STUDENT')">Student</div>
+        </div>
+    </div>
+</header>
+
+</body>
+</html>
